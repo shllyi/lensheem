@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Items</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.6/css/all.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/dataTables.bootstrap4.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.5/css/buttons.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+
+  <!-- JS -->
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.10.22/js/dataTables.bootstrap4.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/1.6.5/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/1.6.5/js/buttons.bootstrap4.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.32/vfs_fonts.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.3.5/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.5.2/bootbox.min.js"></script>
+</head>
+<body>
+  <div class="container mt-4">
+    <button type="button" class="btn btn-info mb-3" data-toggle="modal" data-target="#itemModal">
+      Add Item
+    </button>
+    <div class="table-responsive">
+      <table id="itable" class="table table-striped table-hover">
+        <thead>
+          <tr>
+            <th>Item ID</th>
+            <th>Item Name</th>
+            <th>Image</th>
+            <th>Description</th>
+            <th>Cost Price</th>
+            <th>Sell Price</th>
+            <th>Quantity</th>
+            <th>Category</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="ibody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal fade" id="itemModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Item Form</h4>
+          <button type="button" class="btn-close" data-dismiss="modal" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form id="iform" enctype="multipart/form-data">
+            <input type="hidden" id="itemId" name="item_id" />
+            <div class="form-group">
+              <label>Item Name</label>
+              <input type="text" class="form-control" id="name" name="item_name" required />
+            </div>
+            <div class="form-group">
+              <label>Description</label>
+              <input type="text" class="form-control" id="desc" name="description" required />
+            </div>
+            <div class="form-group">
+              <label>Sell Price</label>
+              <input type="number" class="form-control" id="sell" name="sell_price" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label>Cost Price</label>
+              <input type="number" class="form-control" id="cost" name="cost_price" step="0.01" required />
+            </div>
+            <div class="form-group">
+              <label>Quantity</label>
+              <input type="number" class="form-control" id="qty" name="quantity" required />
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <select class="form-control" id="category" name="category_id" required>
+                <option value="">Select a category</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Image</label>
+              <input type="file" class="form-control" id="img" name="image" accept="image/*" />
+              <small class="form-text text-muted">For updates, use 'images' (multiple files allowed)</small>
+              <input type="file" class="form-control mt-2" id="imgs" name="images" accept="image/*" multiple style="display: none;" />
+              <div id="itemPreview" class="mt-2"></div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button id="itemSubmit" type="submit" class="btn btn-primary">Save</button>
+          <button id="itemUpdate" type="submit" class="btn btn-success" style="display: none;">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    $(document).ready(function () {
+      const baseUrl = 'http://localhost:3000/api/item';
+      const adminUrl = 'http://localhost:3000/api/item/admin';
+      const categoryUrl = 'http://localhost:3000/api/category';
+      const imageBaseUrl = 'http://localhost:3000/uploads/';
+
+      // Load categories
+      $.get(categoryUrl, function (res) {
+        if (res.success) {
+          res.data.forEach(cat => {
+            $('#category').append(`<option value="${cat.category_id}">${cat.description}</option>`);
+          });
+        }
+      }).fail(function(xhr, status, error) {
+        console.error('Failed to load categories:', error);
+        Swal.fire('Error', 'Failed to load categories.', 'error');
+      });
+
+      // Initialize DataTable
+      const table = $('#itable').DataTable({
+        ajax: {
+          url: adminUrl,
+          dataSrc: 'data'
+        },
+        dom: 'Bfrtip',
+        buttons: ['pdf', 'excel'],
+        columns: [
+          { data: 'item_id' },
+          { data: 'item_name' },
+          {
+            data: 'image',
+            render: function (data) {
+              return data ? `<img src="${imageBaseUrl}${data}" width="50" height="60" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA1MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZjBmMGYwIi8+Cjx0ZXh0IHg9IjI1IiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjEwIiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD4KPHN2Zz4K'" />` : 'No Image';
+            }
+          },
+          { data: 'description' },
+          { 
+            data: 'cost_price',
+            render: function(data) {
+              return data ? parseFloat(data).toFixed(2) : '0.00';
+            }
+          },
+          { 
+            data: 'sell_price',
+            render: function(data) {
+              return data ? parseFloat(data).toFixed(2) : '0.00';
+            }
+          },
+          { data: 'quantity' },
+          { data: 'category_name' },
+          {
+            data: null,
+            render: function (data) {
+              return `
+                <a href="#" class="editBtn" data-id="${data.item_id}"><i class="fas fa-edit text-primary" style="font-size: 20px;"></i></a>
+                <a href="#" class="deleteBtn ml-2" data-id="${data.item_id}"><i class="fas fa-trash-alt text-danger" style="font-size: 20px;"></i></a>`;
+            }
+          }
+        ]
+      });
+
+      // Reset form when modal opens for new item
+      $('#itemModal').on('show.bs.modal', function (e) {
+        if (!$(e.relatedTarget).hasClass('editBtn')) {
+          $('#iform')[0].reset();
+          $('#itemId').val('');
+          $('#itemPreview').empty();
+          $('#itemSubmit').show();
+          $('#itemUpdate').hide();
+          $('#img').show();
+          $('#imgs').hide();
+        }
+      });
+
+      // Create item - FIXED VERSION
+      $('#itemSubmit').click(function (e) {
+        e.preventDefault();
+        
+        // Validate form
+        if (!$('#iform')[0].checkValidity()) {
+          $('#iform')[0].reportValidity();
+          return;
+        }
+
+        console.log('🚀 Starting item creation...');
+        
+        // Create FormData object
+        const formData = new FormData();
+        
+        // Add all form fields manually
+        formData.append('item_name', $('#name').val());
+        formData.append('description', $('#desc').val());
+        formData.append('sell_price', $('#sell').val());
+        formData.append('cost_price', $('#cost').val());
+        formData.append('quantity', $('#qty').val());
+        formData.append('category_id', $('#category').val());
+        
+        // Add image file if selected
+        const imageFile = $('#img')[0].files[0];
+        if (imageFile) {
+          formData.append('image', imageFile);
+          console.log('📸 Image file added:', imageFile.name, imageFile.size, 'bytes');
+        } else {
+          console.log('⚠️ No image file selected');
+        }
+
+        // Log FormData contents
+        console.log('📦 FormData contents:');
+        for (let pair of formData.entries()) {
+          console.log('  ', pair[0], ':', pair[1]);
+        }
+        
+        $.ajax({
+          url: adminUrl,
+          method: 'POST',
+          data: formData,
+          contentType: false,
+          processData: false,
+          success: function (response) {
+            console.log('✅ Success:', response);
+            Swal.fire('Success', 'Item created successfully!', 'success');
+            $('#itemModal').modal('hide');
+            table.ajax.reload();
+          },
+          error: function (xhr, status, error) {
+            console.error('❌ Error:', xhr.responseText);
+            console.error('Status:', status);
+            console.error('Error:', error);
+            Swal.fire('Error', 'Failed to create item: ' + (xhr.responseJSON?.message || error), 'error');
+          }
+        });
+      });
+
+      // Edit item
+      $('#itable tbody').on('click', '.editBtn', function (e) {
+        e.preventDefault();
+        const id = $(this).data('id');
+        
+        $('#itemSubmit').hide();
+        $('#itemUpdate').show();
+        $('#img').hide();
+        $('#imgs').show();
+        $('#itemPreview').empty();
+
+        $.get(`${adminUrl}/${id}`, function (res) {
+          if (res.success && res.result && res.result.length > 0) {
+            const item = res.result[0];
+            $('#itemId').val(item.item_id);
+            $('#name').val(item.item_name);
+            $('#desc').val(item.description);
+            $('#sell').val(item.sell_price);
+            $('#cost').val(item.cost_price);
+            $('#qty').val(item.quantity);
+            $('#category').val(item.category_id);
+            
+            if (item.image) {
+              $('#itemPreview').html(`<img src="${imageBaseUrl}${item.image}" width="150" class="img-thumbnail">`);
+            }
+            
+            $('#itemModal').modal('show');
+          } else {
+            Swal.fire('Error', 'No item data found.', 'error');
+          }
+        }).fail(function (xhr, status, error) {
+          console.error('Failed to fetch item:', error);
+          Swal.fire('Error', 'Failed to fetch item data.', 'error');
+        });
+      });
+
+      // Update item
+      $('#itemUpdate').click(function (e) {
+        e.preventDefault();
+        
+        const id = $('#itemId').val();
+        if (!id) {
+          Swal.fire('Error', 'No item ID found.', 'error');
+          return;
+        }
+
+        // Validate form
+        if (!$('#iform')[0].checkValidity()) {
+          $('#iform')[0].reportValidity();
+          return;
+        }
+
+        console.log('🚀 Starting item update...');
+        
+        // Create FormData object
+        const formData = new FormData();
+        
+        // Add all form fields manually
+        formData.append('item_name', $('#name').val());
+        formData.append('description', $('#desc').val());
+        formData.append('sell_price', $('#sell').val());
+        formData.append('cost_price', $('#cost').val());
+        formData.append('quantity', $('#qty').val());
+        formData.append('category_id', $('#category').val());
+        
+        // Add image files if selected (multiple for updates)
+        const imageFiles = $('#imgs')[0].files;
+        if (imageFiles.length > 0) {
+          for (let i = 0; i < imageFiles.length; i++) {
+            formData.append('images', imageFiles[i]);
+            console.log('📸 Image file added:', imageFiles[i].name);
+          }
+        } else {
+          console.log('⚠️ No new image files selected');
+        }
+
+        // Log FormData contents
+        console.log('📦 FormData contents:');
+        for (let pair of formData.entries()) {
+          console.log('  ', pair[0], ':', pair[1]);
+        }
+        
+        $.ajax({
+          url: `${adminUrl}/${id}`,
+          method: 'PUT',
+          data: formData,
+          contentType: false,
+          processData: false,
+          success: function (response) {
+            console.log('✅ Update success:', response);
+            Swal.fire('Updated', 'Item updated successfully!', 'success');
+            $('#itemModal').modal('hide');
+            table.ajax.reload();
+          },
+          error: function (xhr, status, error) {
+            console.error('❌ Update error:', xhr.responseText);
+            Swal.fire('Error', 'Failed to update item: ' + (xhr.responseJSON?.message || error), 'error');
+          }
+        });
+      });
+
+      // Delete item
+      $('#itable tbody').on('click', '.deleteBtn', function (e) {
+        e.preventDefault();
+        const id = $(this).data('id');
+        
+        Swal.fire({
+          title: 'Are you sure?',
+          text: 'This item will be permanently deleted.',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Yes, delete it!'
+        }).then(result => {
+          if (result.isConfirmed) {
+            $.ajax({
+              url: `${adminUrl}/${id}`,
+              method: 'DELETE',
+              success: function (response) {
+                console.log('✅ Delete success:', response);
+                Swal.fire('Deleted!', 'Item has been deleted.', 'success');
+                table.ajax.reload();
+              },
+              error: function (xhr, status, error) {
+                console.error('❌ Delete error:', xhr.responseText);
+                Swal.fire('Error', 'Failed to delete item: ' + (xhr.responseJSON?.message || error), 'error');
+              }
+            });
+          }
+        });
+      });
+
+      // Debug: File input change event
+      $('#img').on('change', function() {
+        const file = this.files[0];
+        if (file) {
+          console.log('📸 File selected:', file.name, file.size, 'bytes', file.type);
+        }
+      });
+    });
+  </script>
+</body>
+</html>
