@@ -89,6 +89,7 @@ body {
     border: 1px solid #f0f0f0;
     position: relative;
     overflow: hidden;
+    cursor: pointer;
 }
 
 .product-item:hover {
@@ -200,6 +201,8 @@ body {
     transition: all 0.3s ease;
     width: 100%;
     border-radius: 0;
+    position: relative;
+    z-index: 10;
 }
 
 .btn-add-cart:hover {
@@ -460,7 +463,7 @@ body {
                         }
 
                         html += `
-                            <div class="product-item">
+                            <div class="product-item" data-item-id="${itemId}">
                                 <div class="product-image">
                                     ${imageHtml}
                                     ${hasDiscount || isNew ? `
@@ -554,8 +557,28 @@ body {
                 loadItems($(this).val());
             });
 
+            // Product click handler - redirect to itemdesc.html
+            $(document).on('click', '.product-item', function(e) {
+                // Prevent navigation if clicking on the add to cart button
+                if ($(e.target).closest('.btn-add-cart').length) {
+                    return;
+                }
+                
+                // Prevent navigation if clicking on carousel controls
+                if ($(e.target).closest('.carousel-control-prev, .carousel-control-next').length) {
+                    return;
+                }
+
+                const itemId = $(this).data('item-id');
+                if (itemId) {
+                    window.location.href = `itemdesc.html?id=${itemId}`;
+                }
+            });
+
             // Add to cart (updated from second code)
-            $(document).on('click', '.btn-add-cart', function() {
+            $(document).on('click', '.btn-add-cart', function(e) {
+                e.stopPropagation(); // Prevent product click event
+                
                 const token = localStorage.getItem('token');
                 const userId = localStorage.getItem('userId');
 

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Item Description</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css">
+  <style>
+    .price { color: red; font-size: 24px; }
+    .old-price { text-decoration: line-through; color: grey; }
+    .tag { font-size: 12px; font-weight: bold; margin-right: 5px; }
+    .in-stock { color: green; font-weight: bold; }
+    .btn-buy { background-color: #f44336; color: white; }
+    .product-img { max-width: 100%; height: auto; border: 1px solid #ddd; }
+    .loading { text-align: center; margin-top: 50px; }
+    .error { color: red; text-align: center; margin-top: 50px; }
+  </style>
+</head>
+<body>
+  <div class="container mt-4">
+    <div id="loading" class="loading">
+      <div class="spinner-border" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+      <p>Loading product...</p>
+    </div>
+    
+    <div id="error" class="error" style="display: none;">
+      <h4>Error loading product</h4>
+      <p id="error-message"></p>
+    </div>
+    
+    <div id="product-content" class="row" style="display: none;">
+      <div class="col-md-6">
+        <img id="product-img" src="" class="product-img" alt="Product Image">
+        <div class="mt-2">
+          <span class="badge badge-danger tag">SALE</span>
+          <span class="badge badge-info tag">NEW</span>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h4 id="product-name">PRODUCT NAME</h4>
+        <p class="in-stock" id="stock-status">In Stock</p>
+        <p id="product-sku">SKU: -</p>
+        <p><span class="old-price" id="old-price"></span> <span class="price" id="new-price"></span></p>
+        <p class="text-danger">5 sold in last 26 hours</p>
+        <ul id="product-description">
+          <li>Loading description...</li>
+        </ul>
+        <p class="text-success" id="stock-left"></p>
+        <div class="form-inline mb-2">
+          <label class="mr-2">Qty</label>
+          <input type="number" value="1" min="1" class="form-control w-25 mr-2" id="quantity">
+          <button class="btn btn-dark mr-2">Add to Cart</button>
+          <button class="btn btn-buy">Buy It Now</button>
+        </div>
+        <p><small><i class="fas fa-truck"></i> Estimated delivery: May 1 - May 7</small></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <script src="https://use.fontawesome.com/releases/v5.0.6/js/all.js"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const itemId = urlParams.get('id');
+
+    $(document).ready(function () {
+      if (!itemId) {
+        showError('No item ID provided in the URL');
+        return;
+      }
+
+      // Load product data
+      $.get(`http://localhost:3000/api/item/${itemId}`)
+        .done(function (res) {
+          if (!res.success || !res.result || res.result.length === 0) {
+            showError('Product not found or unavailable');
+            return;
+          }
+
+          const item = res.result[0];
+          displayProduct(item);
+        })
+        .fail(function (xhr) {
+          console.error('API Error:', xhr);
+          if (xhr.status === 404) {
+            showError('Product not found or has been removed');
+          } else {
+            showError('Failed to load product. Please try again later.');
+          }
+        });
+    });
+
+    function displayProduct(item) {
+      const price = parseFloat(item.sell_price).toFixed(2);
+      const cost = parseFloat(item.cost_price).toFixed(2);
+
+      $('#product-name').text(item.item_name);
+      $('#product-sku').text(`SKU: ${item.item_id}`);
+      $('#old-price').text(`$${cost}`);
+      $('#new-price').text(`$${price}`);
+      $('#stock-left').text(`Hurry! Only ${item.quantity} left in stock.`);
+      
+      // Handle image display
+      if (item.image) {
+        $('#product-img').attr('src', `http://localhost:3000/uploads/${item.image}`);
+      } else {
+        $('#product-img').attr('src', 'https://via.placeholder.com/400x300?text=No+Image');
+      }
+
+      // Handle description
+      const descriptionItems = item.description ? item.description.split('.') : [];
+      const descriptionHTML = descriptionItems
+        .filter(d => d.trim())
+        .map(d => `<li>${d.trim()}</li>`)
+        .join('');
+      
+      if (descriptionHTML) {
+        $('#product-description').html(descriptionHTML);
+      } else {
+        $('#product-description').html('<li>No description available</li>');
+      }
+
+      // Set max quantity
+      $('#quantity').attr('max', item.quantity);
+
+      // Update stock status
+      if (item.quantity > 0) {
+        $('#stock-status').text('In Stock').removeClass('text-danger').addClass('text-success');
+      } else {
+        $('#stock-status').text('Out of Stock').removeClass('text-success').addClass('text-danger');
+        $('button').prop('disabled', true);
+      }
+
+      // Hide loading and show product
+      $('#loading').hide();
+      $('#product-content').show();
+    }
+
+    function showError(message) {
+      $('#loading').hide();
+      $('#error-message').text(message);
+      $('#error').show();
+    }
+  </script>
+</body>
+</html>

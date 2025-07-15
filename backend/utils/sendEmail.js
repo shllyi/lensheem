@@ -7,14 +7,14 @@ const sendEmail = async () => {
       host: "sandbox.smtp.mailtrap.io",
       port: 2525,
       auth: {
-        user: "e0f837c85026bd", // replace with your actual Mailtrap user
-        pass: "de297558efe26b"  // replace with your actual Mailtrap password
+        user: "38515dfa92f3a2", // replace with your actual Mailtrap user
+        pass: "48bac8666c1829"  // replace with your actual Mailtrap password
       }
     });
 
     // Create the message
     const message = {
-      from: "Drift n' Dash <no-reply@driftndash.com>",  // sender
+      from: "LenSheem <no-reply@driftndash.com>",  // sender
       to: "test@example.com",                           // receiver (Mailtrap will catch this)
       subject: "Order Updated!",
       html: "<h1>Hello!</h1><p>This is a test email sent using async/await with Mailtrap.</p>"
