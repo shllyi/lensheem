@@ -242,6 +242,13 @@ body {
     margin-bottom: 20px;
 }
 
+/* Carousel Styles */
+.carousel-control-prev-icon,
+.carousel-control-next-icon {
+    background-color: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+}
+
 /* Responsive Design */
 @media (max-width: 1200px) {
     .product-grid {
@@ -292,7 +299,6 @@ body {
                                     <div class="wrap-caption center">
                                         <h2 class="h1 mega-title slideshow__title">Shop Our New Collection</h2>
                                         <span class="mega-subtitle slideshow__subtitle">From High to Low, Classic or Modern. We Have You Covered</span>
-                                        <span class="btn">Shop Now</span>
                                     </div>
                                 </div>
                             </div>
@@ -306,7 +312,6 @@ body {
                                     <div class="wrap-caption center">
                                         <h2 class="h1 mega-title slideshow__title">Chromaflare Collection</h2>
                                         <span class="mega-subtitle slideshow__subtitle">Save up to 50% off this weekend only</span>
-                                        <span class="btn">Shop Now</span>
                                     </div>
                                 </div>
                             </div>
@@ -328,10 +333,6 @@ body {
                             <div class="col-md-6">
                                 <select class="form-select" id="categoryFilter">
                                     <option value="">All Categories</option>
-                                    <option value="1">RLC Exclusive</option>
-                                    <option value="2">RLC Membership</option>
-                                    <option value="3">F1 Series</option>
-                                    <option value="4">Elite 64</option>
                                 </select>
                             </div>
                             <div class="col-md-6 text-end">
@@ -364,20 +365,43 @@ body {
     <script src="assets/js/main.js"></script>
 
     <script>
-        const categoryNames = {
-            1: "RLC Exclusive",
-            2: "RLC Membership", 
-            3: "F1 Series",
-            4: "Elite 64"
-        };
+        // Helper function to parse images (from second code)
+        function parseImages(imageField) {
+            if (!imageField) return [];
+            if (Array.isArray(imageField)) return imageField;
+            return [imageField];
+        }
 
+        // Helper function to update cart count
+        function updateCartCount() {
+            const cart = JSON.parse(localStorage.getItem('cart')) || [];
+            $('#cart-count').text(cart.length);
+        }
+
+        // Load categories function (from second code)
+        function loadCategories() {
+            $.get('/api/category', function(res) {
+                if (res.success && Array.isArray(res.data)) {
+                    const $filter = $('#categoryFilter');
+                    res.data.forEach(cat => {
+                        $filter.append(`<option value="${cat.category_id}">${cat.description}</option>`);
+                    });
+                } else {
+                    console.warn('Failed to load categories.');
+                }
+            }).fail(() => {
+                console.error('Error fetching categories.');
+            });
+        }
+
+        // Modified loadItems function (combining both codes)
         function loadItems(categoryId = '') {
             $('#productGrid').html('<div class="loading-state"><div class="loading-spinner">Loading Collection...</div></div>');
 
             const url = categoryId ? `/api/item/category/${categoryId}` : `/api/item`;
 
             $.get(url, function(res) {
-                if (res.status === 'success') {
+                if (res.status === 'success' || res.success) {
                     const items = res.data;
                     $('#product-count').text(items.length);
 
@@ -393,16 +417,52 @@ body {
 
                     let html = '';
                     items.forEach(item => {
+                        // Parse images (from second code)
+                        let images = parseImages(item.images || item.image);
+                        images = [...new Set(images)]; // Deduplicate
+                        
+                        // Use item.id or item.item_id depending on API response
+                        const itemId = item.id || item.item_id;
+                        const itemName = item.item_name;
+                        const sellPrice = item.sell_price;
+                        
+                        // Handle discount logic (from first code)
                         const hasDiscount = item.discount_percentage && item.discount_percentage > 0;
-                        const originalPrice = hasDiscount ? (item.sell_price / (1 - item.discount_percentage / 100)).toFixed(2) : null;
+                        const originalPrice = hasDiscount ? (sellPrice / (1 - item.discount_percentage / 100)).toFixed(2) : null;
                         const isNew = item.is_new || false;
+
+                        // Create image HTML with carousel support (from second code)
+                        let imageHtml = '';
+                        const uniqueCarouselId = `carousel-${itemId}`;
+                        
+                        if (images.length === 0) {
+                            imageHtml = `<img src="https://via.placeholder.com/400x300/f8f9fa/333?text=GLASSES" alt="${itemName}">`;
+                        } else if (images.length === 1) {
+                            imageHtml = `<img src="/uploads/${images[0]}" alt="${itemName}" onerror="this.src='https://via.placeholder.com/400x300/f8f9fa/333?text=GLASSES'">`;
+                        } else {
+                            imageHtml = `
+                                <div id="${uniqueCarouselId}" class="carousel slide" data-bs-ride="carousel">
+                                    <div class="carousel-inner">
+                                        ${images.map((img, idx) => `
+                                            <div class="carousel-item ${idx === 0 ? 'active' : ''}">
+                                                <img src="/uploads/${img}" class="d-block w-100" alt="${itemName}" onerror="this.src='https://via.placeholder.com/400x300/f8f9fa/333?text=GLASSES'">
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#${uniqueCarouselId}" data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#${uniqueCarouselId}" data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    </button>
+                                </div>
+                            `;
+                        }
 
                         html += `
                             <div class="product-item">
                                 <div class="product-image">
-                                    <img src="/uploads/${item.image || 'default.jpg'}" 
-                                         alt="${item.item_name}" 
-                                         onerror="this.src='https://via.placeholder.com/400x300/f8f9fa/333?text=GLASSES'">
+                                    ${imageHtml}
                                     ${hasDiscount || isNew ? `
                                         <div class="product-labels">
                                             ${hasDiscount ? `<span class="product-label sale">Sale</span>` : ''}
@@ -411,16 +471,17 @@ body {
                                     ` : ''}
                                 </div>
                                 <div class="product-content">
-                                    <h3 class="product-title">${item.item_name}</h3>
+                                    <h3 class="product-title">${itemName}</h3>
                                     <div class="product-price">
                                         ${originalPrice ? `<span class="price-original">₱${originalPrice}</span>` : ''}
-                                        <span class="price-current">₱${parseFloat(item.sell_price).toFixed(2)}</span>
+                                        <span class="price-current">₱${parseFloat(sellPrice).toFixed(2)}</span>
                                     </div>
                                     <div class="product-actions">
                                         <button class="btn-add-cart" 
-                                                data-id="${item.id}" 
-                                                data-name="${item.item_name}" 
-                                                data-price="${item.sell_price}">
+                                                data-id="${itemId}" 
+                                                data-name="${itemName}" 
+                                                data-price="${sellPrice}"
+                                                data-image="${images[0] || 'default.jpg'}">
                                             Add to Cart
                                         </button>
                                     </div>
@@ -449,65 +510,87 @@ body {
         }
 
         $(document).ready(function() {
-            // Load header
-            if ($('#header').length) {
-                $('#header').load('/header.html', function() {
-                    const dropdownTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
-                    dropdownTriggerList.map(function(dropdownTriggerEl) {
-                        return new bootstrap.Dropdown(dropdownTriggerEl);
-                    });
+            // Load header (from second code)
+            $('#header').load('/header.html', function() {
+                const dropdownTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="dropdown"]'));
+                dropdownTriggerList.map(function(dropdownTriggerEl) {
+                    return new bootstrap.Dropdown(dropdownTriggerEl);
                 });
-            }
 
-            // Authentication check
-            const token = localStorage.getItem('token');
-            const userId = localStorage.getItem('userId');
+                // Authentication check (from first code)
+                const token = localStorage.getItem('token');
+                const userId = localStorage.getItem('userId');
 
-            if (token && userId) {
-                $('#login-link, #register-link').addClass('d-none');
-                $('#user-dropdown').removeClass('d-none');
+                if (token && userId) {
+                    $('#login-link, #register-link').addClass('d-none');
+                    $('#user-dropdown').removeClass('d-none');
 
-                $.get(`/api/users/customers/${userId}`, function(res) {
-                    if (res.success && res.data) {
-                        const data = res.data;
-                        const fullName = `${data.fname || ''} ${data.lname || ''}`.trim();
-                        $('#username').text(fullName || 'USER');
-                        if (data.image_path) {
-                            $('.profile-img').attr('src', `/${data.image_path}`);
+                    $.get(`/api/users/customers/${userId}`, function(res) {
+                        if (res.success && res.data) {
+                            const data = res.data;
+                            const fullName = `${data.fname || ''} ${data.lname || ''}`.trim();
+                            $('#username').text(fullName || 'USER');
+                            if (data.image_path) {
+                                $('.profile-img').attr('src', `/${data.image_path}`);
+                            }
                         }
-                    }
-                }).fail(function() {
-                    console.log('Failed to load user data');
-                });
-            } else {
-                $('#login-link, #register-link').removeClass('d-none');
-                $('#user-dropdown').addClass('d-none');
-            }
+                    }).fail(function() {
+                        console.log('Failed to load user data');
+                    });
+                } else {
+                    $('#login-link, #register-link').removeClass('d-none');
+                    $('#user-dropdown').addClass('d-none');
+                }
 
-            // Load products
+                updateCartCount();
+            });
+
+            // Load products and categories
             loadItems();
+            loadCategories();
 
             // Category filter
             $('#categoryFilter').on('change', function() {
                 loadItems($(this).val());
             });
 
-            // Add to cart
+            // Add to cart (updated from second code)
             $(document).on('click', '.btn-add-cart', function() {
+                const token = localStorage.getItem('token');
+                const userId = localStorage.getItem('userId');
+
+                if (!token || !userId) {
+                    alert('You must be logged in first!');
+                    window.location.href = '/login.html';
+                    return;
+                }
+
                 const $btn = $(this);
                 const product = {
                     id: $btn.data('id'),
                     name: $btn.data('name'),
-                    price: $btn.data('price')
+                    price: $btn.data('price'),
+                    image_path: $btn.data('image'),
+                    quantity: 1
                 };
-                
+
+                let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+                const existingItem = cart.find(item => item.id === product.id);
+                if (existingItem) {
+                    existingItem.quantity += 1;
+                } else {
+                    cart.push(product);
+                }
+
+                localStorage.setItem('cart', JSON.stringify(cart));
+                updateCartCount();
+
                 $btn.addClass('added').text('Added to Cart');
                 
                 setTimeout(() => {
                     $btn.removeClass('added').text('Add to Cart');
                 }, 2000);
-                
-                console.log('Product added:', product);
             });
 
             // Logout
@@ -520,7 +603,7 @@ body {
             });
         });
 
-        // Newsletter popup script
+        // Newsletter popup script (from first code)
         jQuery(document).ready(function(){  
             jQuery('.closepopup').on('click', function () {
                 jQuery('#popup-container').fadeOut();
