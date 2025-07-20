@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Orders</title>
+  <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+  <style>
+    body { padding: 2rem; }
+    table.dataTable thead th, table.dataTable tbody td { white-space: nowrap; }
+    .order-items-list { font-size: 0.95em; color: #555; }
+  </style>
+</head>
+<body>
+  <h2>All Orders (Admin)</h2>
+  <table id="ordersTable" class="display" style="width:100%">
+    <thead>
+      <tr>
+        <th>Order ID</th>
+        <th>Customer ID</th>
+        <th>Date Placed</th>
+        <th>Date Shipped</th>
+        <th>Date Delivered</th>
+        <th>Status</th>
+        <th>Shipping Region</th>
+        <th>Shipping Rate</th>
+        <th>Items</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Data will be inserted here -->
+    </tbody>
+  </table>
+
+  <script src="assets/js/vendor/jquery-3.3.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <!-- ...existing HTML... -->
+<script>
+    $(document).ready(function() {
+      $.get('/api/orders/admin/all', function(response) {
+        if (response.success) {
+          const statusOptions = ['Pending', 'Shipped', 'Delivered', 'Cancelled'];
+          const rows = response.data.map(order => {
+            const itemsHtml = order.items.map(item =>
+              `<div class="order-items-list">${item.item_name} (x${item.quantity}) - ₱${item.price}</div>`
+            ).join('');
+            const statusDropdown = `
+              <select class="order-status-dropdown" data-order-id="${order.orderinfo_id}">
+                ${statusOptions.map(opt => `<option value="${opt}"${order.status === opt ? ' selected' : ''}>${opt}</option>`).join('')}
+              </select>
+            `;
+            return `
+              <tr>
+                <td>${order.orderinfo_id}</td>
+                <td>${order.customer_id}</td>
+                <td>${order.date_placed || ''}</td>
+                <td>${order.date_shipped || ''}</td>
+                <td>${order.date_delivered || ''}</td>
+                <td>${statusDropdown}</td>
+                <td>${order.region}</td>
+                <td>₱${order.rate}</td>
+                <td>${itemsHtml}</td>
+              </tr>
+            `;
+          }).join('');
+          $('#ordersTable tbody').html(rows);
+          $('#ordersTable').DataTable();
+        } else {
+          alert('Failed to load orders.');
+        }
+      });
+  
+      // Handle status change
+      $('#ordersTable').on('change', '.order-status-dropdown', function() {
+        const orderId = $(this).data('order-id');
+        const newStatus = $(this).val();
+        $.ajax({
+          url: `/api/orders/${orderId}/status`,
+          method: 'PUT',
+          contentType: 'application/json',
+          data: JSON.stringify({ newStatus }),
+          success: function(res) {
+            alert('Order status updated!');
+          },
+          error: function() {
+            alert('Failed to update order status.');
+          }
+        });
+      });
+    });
+  </script>
+  <!-- ...existing HTML... -->
+</body>
+</html>

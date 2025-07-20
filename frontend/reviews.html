@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Reviews</title>
+  <link rel="stylesheet" href="assets/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <style>
+    body { 
+      padding: 2rem; 
+      background-color: #f8f9fa;
+    }
+    .reviews-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: 15px;
+      margin-bottom: 2rem;
+    }
+    .review-card {
+      background: white;
+      border-radius: 15px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 2rem;
+      transition: transform 0.2s;
+    }
+    .review-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    .item-image {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      border: 2px solid #e9ecef;
+    }
+    .rating-stars {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 0.5rem;
+    }
+    .star {
+      font-size: 1rem;
+      color: #ffc107;
+    }
+    .star.empty {
+      color: #dee2e6;
+    }
+    .review-text {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin: 0.5rem 0;
+      font-style: italic;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .review-images {
+      display: flex;
+      gap: 8px;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .review-image {
+      width: 60px;
+      height: 60px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .review-image:hover {
+      transform: scale(1.1);
+    }
+    .back-btn {
+      background: #6c757d;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 25px;
+      color: white;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background-color 0.3s;
+    }
+    .back-btn:hover {
+      background: #5a6268;
+      color: white;
+      text-decoration: none;
+    }
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: #6c757d;
+    }
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 1rem;
+      border-radius: 8px;
+      margin: 1rem 0;
+    }
+    .no-reviews {
+      text-align: center;
+      padding: 3rem;
+      color: #6c757d;
+    }
+    .view-details-btn {
+      background: #007bff;
+      border: none;
+      color: white;
+      padding: 0.25rem 0.5rem;
+      border-radius: 15px;
+      font-size: 0.8rem;
+      text-decoration: none;
+      transition: background-color 0.3s;
+    }
+    .view-details-btn:hover {
+      background: #0056b3;
+      color: white;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Back Button -->
+    <div class="mb-3">
+      <a href="javascript:history.back()" class="back-btn">
+        <i class="fas fa-arrow-left"></i> Back
+      </a>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading">
+      <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+      <p>Loading your reviews...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="error" style="display: none;">
+      <i class="fas fa-exclamation-triangle"></i>
+      <span id="errorMessage"></span>
+    </div>
+
+    <!-- Reviews Content -->
+    <div id="reviewsContent" style="display: none;">
+      <!-- Reviews Header -->
+      <div class="reviews-header">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <h1 class="mb-2">
+              <i class="fas fa-star me-3"></i>
+              My Reviews
+            </h1>
+            <p class="mb-0">
+              <i class="fas fa-list me-2"></i>
+              <span id="reviewCount">0</span> reviews submitted
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviews List -->
+      <div id="reviewsList"></div>
+    </div>
+  </div>
+
+  <!-- Image Modal -->
+  <div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Review Image</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body text-center">
+          <img id="modalImage" src="" class="img-fluid" alt="Review Image">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/vendor/jquery-3.3.1.min.js"></script>
+  <script src="assets/js/bootstrap.min.js"></script>
+  <script>
+    // Check if user is logged in
+    const token = localStorage.getItem('token');
+    const customerId = localStorage.getItem('customer_id');
+    
+    if (!token || !customerId) {
+      console.log('User not logged in, redirecting to login page');
+      alert('Please log in to view your reviews.');
+      window.location.href = 'login.html';
+    } else {
+      loadCustomerReviews(customerId);
+    }
+
+    function loadCustomerReviews(customerId) {
+      console.log('Loading reviews for customer:', customerId);
+      $.get(`/api/reviews/customer/${customerId}`, function(response) {
+        console.log('API Response:', response);
+        if (response.success) {
+          displayReviews(response.data);
+        } else {
+          showError(response.message || 'Failed to load reviews');
+        }
+      }).fail(function(xhr, status, error) {
+        console.error('API Error:', {xhr, status, error});
+        console.error('Response text:', xhr.responseText);
+        showError('Failed to load reviews. Please try again.');
+      });
+    }
+
+    function displayReviews(reviews) {
+      // Hide loading, show content
+      $('#loading').hide();
+      $('#reviewsContent').show();
+
+      // Update review count
+      $('#reviewCount').text(reviews.length);
+
+      if (reviews.length === 0) {
+        $('#reviewsList').html(`
+          <div class="no-reviews">
+            <i class="fas fa-star fa-3x mb-3 text-muted"></i>
+            <h4>No Reviews Yet</h4>
+            <p>You haven't submitted any reviews yet.</p>
+            <a href="orders.html" class="btn btn-primary">View Your Orders</a>
+          </div>
+        `);
+        return;
+      }
+
+      // Display reviews
+      const reviewsHtml = reviews.map(review => {
+        console.log('Review data:', review); // Debug log
+        
+        const starsHtml = generateStars(review.rating);
+        const reviewText = review.review_text && review.review_text.trim() 
+          ? review.review_text 
+          : '<em class="text-muted">No review text provided</em>';
+        
+        const imagesHtml = review.images && review.images.length > 0 
+          ? review.images.map(img => `
+              <img src="/uploads/${img}" class="review-image" onclick="openImageModal('${img}')" alt="Review Image">
+            `).join('')
+          : '<span class="text-muted">No images</span>';
+
+        const itemImagePath = review.item_image ? `/uploads/${review.item_image}` : '/assets/images/default.jpg';
+        console.log('Item image path:', itemImagePath); // Debug log
+
+        return `
+          <div class="review-card">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-2">
+                  <img src="${itemImagePath}" class="item-image" alt="${review.item_name || 'Item'}" onerror="this.src='/assets/images/default.jpg'">
+                </div>
+                <div class="col-md-8">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 class="mb-1">${review.item_name || 'Item Name Not Available'}</h6>
+                      <div class="rating-stars">${starsHtml}</div>
+                      <small class="text-muted">Order #${review.orderinfo_id} • ${formatDate(review.created_at)}</small>
+                    </div>
+                    <a href="review.html?id=${review.review_id}" class="view-details-btn">
+                      <i class="fas fa-eye me-1"></i>View Details
+                    </a>
+                  </div>
+                  
+                  <div class="review-text">${reviewText}</div>
+                  
+                  <div class="review-images">
+                    ${imagesHtml}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      $('#reviewsList').html(reviewsHtml);
+    }
+
+    function generateStars(rating) {
+      let starsHtml = '';
+      for (let i = 1; i <= 5; i++) {
+        if (i <= rating) {
+          starsHtml += '<i class="fas fa-star star"></i>';
+        } else {
+          starsHtml += '<i class="fas fa-star star empty"></i>';
+        }
+      }
+      return starsHtml;
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+
+    function showError(message) {
+      $('#loading').hide();
+      $('#errorMessage').text(message);
+      $('#error').show();
+    }
+
+    function openImageModal(imagePath) {
+      $('#modalImage').attr('src', `/uploads/${imagePath}`);
+      $('#imageModal').modal('show');
+    }
+  </script>
+</body>
+</html> 
